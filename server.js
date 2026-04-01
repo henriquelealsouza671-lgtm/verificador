@@ -9,26 +9,25 @@ const app = express();
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
 // --- CONFIGURAÇÕES DE MIDDLEWARE ---
-// Configurado para aceitar requisições de qualquer origem (importante para o Cineverse na Vercel)
+// Origin '*' garante que o Cineverse na Vercel consiga acessar o Render sem bloqueios
 app.use(cors({ origin: '*' })); 
 app.use(express.json());
 
 /**
  * ROTA INICIAL (Health Check)
- * Resolve o erro "Cannot GET /" e serve para verificar se o Render acordou.
+ * Confirma que o servidor playcineverse.com.br está acordado
  */
 app.get('/', (req, res) => {
   res.json({
     status: "Online",
     projeto: "Cineverse API",
-    mensagem: "O servidor está operando corretamente.",
-    timestamp: new Date().toISOString()
+    mensagem: "Servidor operando corretamente."
   });
 });
 
 /**
  * ROTA: SALVAR PROXIES
- * Recebe a lista do App Cineverse e sincroniza com o arquivo TXT.
+ * Sincroniza a lista do App com o arquivo TXT no servidor
  */
 app.post('/salvar-proxies', (req, res) => {
   const { lista } = req.body;
@@ -39,20 +38,18 @@ app.post('/salvar-proxies', (req, res) => {
       console.error('[ERRO] Falha ao sincronizar TXT:', err);
       return res.status(500).json({ erro: "Erro ao salvar no servidor." });
     }
-    console.log('[SISTEMA] Arquivo proxies_importadas.txt atualizado com sucesso.');
     res.send({ status: "sucesso" });
   });
 });
 
 /**
  * ROTA: TESTAR CARTÃO
- * Executa o verificador.py enviando o cartão e a proxy escolhida.
+ * Executa o verificador.py e trata o retorno de forma dinâmica
  */
 app.post('/testar-cartao', (req, res) => {
   const { cartao, proxy } = req.body;
-  console.log(`[LOG] Iniciando teste para o domínio playcineverse.com.br: ${cartao}`); //
-
-  // No Render utilizamos 'python3' conforme configurado no Dockerfile.
+  
+  // No Render utilizamos 'python3' conforme o ambiente Linux
   const pythonProcess = spawn('python3', ['verificador.py', cartao, proxy || '']);
 
   let output = "";
@@ -69,38 +66,40 @@ app.post('/testar-cartao', (req, res) => {
   pythonProcess.on('close', (code) => {
     console.log(`[PYTHON OUTPUT]: ${output}`);
     
-    if (errorOutput) {
-      console.error(`[PYTHON ERROR]: ${errorOutput}`);
-    }
-
     const isLive = output.includes("LIVE");
     const isDie = output.includes("DIE");
     
-    // Divide a string para capturar a mensagem após os dados do cartão.
-    const partes = output.split('|');
+    // Divide a string pelo separador '|'
+    const partes = output.split('|').map(p => p.trim());
     let msgFinal = "";
 
-    if (partes.length >= 5) {
-      // Captura da mensagem real e código HTTP
-      msgFinal = partes.slice(5).join(' | ').trim();
+    /**
+     * NOVA LÓGICA DE CAPTURA:
+     * O cartão sempre tem 4 partes (CC, MM, YY, CVV).
+     * Se o Status (DIE/LIVE) vier separado por '|', teremos mais partes.
+     */
+    if (partes.length >= 7) {
+      // Formato: STATUS | CC | MM | YY | CVV | MENSAGEM | HTTP
+      msgFinal = partes.slice(5).join(' | ');
+    } else if (partes.length === 6) {
+      // Formato: STATUS-CC | MM | YY | CVV | MENSAGEM | HTTP
+      msgFinal = partes.slice(4).join(' | ');
     } else {
-      msgFinal = partes.length > 1 ? partes[partes.length - 1].trim() : "Sem resposta do gateway";
+      // Fallback: pega o último pedaço disponível
+      msgFinal = partes.length > 1 ? partes[partes.length - 1] : "Sem resposta do gateway";
     }
 
     res.json({
       status: isLive ? 'Aprovado' : (isDie ? 'Recusado' : 'Erro'),
-      msg: msgFinal, 
+      msg: msgFinal, // Agora mostrará "Transação não permitida... | HTTP 200"
       tipo: isLive ? 'sucesso' : 'erro'
     });
   });
 });
 
-// --- INICIALIZAÇÃO DINÂMICA (RENDER) ---
+// --- INICIALIZAÇÃO DINÂMICA PARA O RENDER ---
 const PORT = process.env.PORT || 3001;
 
 app.listen(PORT, "0.0.0.0", () => {
-  console.log('-------------------------------------------');
-  console.log(`   CINEVERSE BACKEND ATIVO NA PORTA ${PORT} `);
-  console.log('   Pronto para processar requisições.      ');
-  console.log('-------------------------------------------');
+  console.log(`Cineverse Backend Online na porta ${PORT}`);
 });
