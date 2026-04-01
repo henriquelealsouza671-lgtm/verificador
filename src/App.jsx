@@ -93,7 +93,7 @@ export default function App() {
 // --- TELAS DO APLICATIVO ---
 
 function TelaTeste({ onTestar, loading }) {
-  const [input, setInput] = useState("4563310048475663|10|2029|160");
+  const [input, setInput] = useState("");
   
   return (
     <div className="mt-6 space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
