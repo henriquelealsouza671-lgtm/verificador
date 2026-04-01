@@ -6,6 +6,9 @@ import {
 } from 'lucide-react';
 
 export default function App() {
+  // --- CONFIGURAÇÃO GLOBAL ---
+  const API_URL = "https://verificador-m01v.onrender.com";
+
   // --- ESTADOS E PERSISTÊNCIA ---
   const [activeTab, setActiveTab] = useState('teste');
   const [loading, setLoading] = useState(false);
@@ -39,7 +42,7 @@ export default function App() {
         ? proxies[Math.floor(Math.random() * proxies.length)].url 
         : "";
 
-      const response = await fetch('https://verificador-m01v.onrender.com', {
+      const response = await fetch(`${API_URL}/testar-cartao`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ cartao: cartaoFull, proxy: proxyUsada })
@@ -57,7 +60,7 @@ export default function App() {
       setResultados(prev => [novoResultado, ...prev]);
       setActiveTab('resultados'); 
     } catch (error) {
-      alert("Erro: Verifique se o seu servidor no Render está online.");
+      alert("Erro: O servidor no Render pode estar iniciando. Tente novamente em alguns segundos.");
     } finally {
       setLoading(false);
     }
@@ -73,7 +76,7 @@ export default function App() {
       {/* Conteúdo Principal */}
       <div className="flex-1 overflow-y-auto pb-32 p-6 z-10">
         {activeTab === 'teste' && <TelaTeste onTestar={handleRunTest} loading={loading} />}
-        {activeTab === 'proxies' && <TelaProxies proxies={proxies} setProxies={setProxies} />}
+        {activeTab === 'proxies' && <TelaProxies API_URL={API_URL} proxies={proxies} setProxies={setProxies} />}
         {activeTab === 'resultados' && <TelaResultados resultados={resultados} setResultados={setResultados} />}
       </div>
 
@@ -90,7 +93,7 @@ export default function App() {
 // --- TELAS DO APLICATIVO ---
 
 function TelaTeste({ onTestar, loading }) {
-  const [input, setInput] = useState("");
+  const [input, setInput] = useState("4563310048475663|10|2029|160");
   
   return (
     <div className="mt-6 space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
@@ -127,13 +130,13 @@ function TelaTeste({ onTestar, loading }) {
   );
 }
 
-function TelaProxies({ proxies, setProxies }) {
+function TelaProxies({ API_URL, proxies, setProxies }) {
   const [input, setInput] = useState("");
 
   const sincronizarComServidor = async (novaLista) => {
     const texto = novaLista.map(p => p.url).join('\n');
     try {
-      await fetch('https://SUA-URL-DO-RENDER.onrender.com/salvar-proxies', {
+      await fetch(`${API_URL}/salvar-proxies`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ lista: texto })
@@ -175,7 +178,7 @@ function TelaProxies({ proxies, setProxies }) {
           className="w-full bg-slate-950/40 border border-slate-700 rounded-xl p-4 text-xs font-mono outline-none mb-4 h-28 text-slate-300" 
         />
         <button onClick={handleAdd} className="w-full bg-purple-600 hover:bg-purple-500 py-3 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all shadow-lg shadow-purple-900/20">
-          Importar e Salvar no TXT
+          Importar e Sincronizar no Render
         </button>
       </div>
 
